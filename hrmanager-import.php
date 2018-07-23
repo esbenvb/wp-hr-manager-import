@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: HR Manager Import
- * Plugin URI: http://www.mywebsite.com/my-first-plugin
- * Description: The very first plugin that I have ever created.
- * Version: 1.0
- * Author: Your Name
- * Author URI: http://www.mywebsite.com
+ * Plugin URI: https://github.com/esbenvb/wp-hr-manager-import
+ * Description: Plugin for importing data from http://hr-manager.net/
+ * Version: 0.1
+ * Author: Esben von Buchwald
+ * Author URI: https://github.com/esbenvb/
  */
 
 function getPublishedPositions()
@@ -25,8 +25,19 @@ function getPublishedPositions()
     return $result;
 }
 
-function updatePositions($positions)
+function updatePositions($customerAlias)
 {
+    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1";
+    $jsonResult = file_get_contents($url);
+    if (!$jsonResult) {
+        return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
+    }
+    $decodedResult = json_decode($jsonResult);
+    if ($decodedResult === null) {
+        return new WP_Error('rest_cannot_decode_data', '', ['status' => 500]);
+    }
+    $positions = $decodedResult->Items;
+
     $status = (object) [
         'updated' => 0,
         'deleted' => 0,
@@ -89,17 +100,15 @@ function webhook(WP_REST_Request $request)
     switch ($eventType) {
         case 'PositionPublished':
         case 'PositionUnpublished':
-            $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1";
-            $jsonResult = file_get_contents($url);
-            if (!$jsonResult) {
-                return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
-            }
-            $decodedResult = json_decode($jsonResult);
-            if ($decodedResult === null) {
-                return new WP_Error('rest_cannot_decode_data', '', ['status' => 500]);
-            }
-            $positionList = $decodedResult->Items;
-            return updatePositions($positionList);
+        case 'AdvertisementUpdated':
+        case 'AdvertisementPublished':
+        case 'AdvertisementUnPublished':
+        case 'ProjectCreated':
+        case 'ProjectUpdated':
+        case 'ProjectUpdated':
+        case 'ProjectDeleted':
+        case 'ProjectDeactivated':
+            return updatePositions($customerAlias);
 
         default:
             return false;
@@ -124,7 +133,7 @@ add_action('init', function () {
             ],
             'public' => true,
             'has_archive' => true,
-            'rewrite' => ['slug' => 'hr-positions'],
+            'rewrite' => ['slug' => get_option('hrmanager_slug')],
         ]
     );
 }, 5, 1);
@@ -197,12 +206,12 @@ function metaboxes()
                 }
                 return $output_array[1] / 1000;
             },
-            'ImageUrl' => (object) [
-                'title' => __('Image URL'),
-                'importValue' => function ($item) {
-                    return $item->Advertisements[0]->ImageUrl ?? null;
-                },
-            ],
+        ],
+        'ImageUrl' => (object) [
+            'title' => __('Image URL'),
+            'importValue' => function ($item) {
+                return $item->Advertisements[0]->ImageUrl ?? null;
+            },
         ],
     ];
 }
@@ -237,20 +246,40 @@ settings_fields('hr-manager_options_group');
     do_settings_sections('hr-manager_options_group');
     ?>
        <fieldset>
-          <legend>Account</legend>
+          <legend>Customer alias</legend>
           <input type="text" name="hrmanager_customer_alias" value="<?php echo esc_attr(get_option('hrmanager_customer_alias')); ?>" />
           <p>Use the customer alias of the HR account.</p>
         </fieldset>
         <fieldset>
-          <legend>API key</legend>
-          <input type="text" name="hrmanager_apikey" value="<?php echo esc_attr(get_option('hrmanager_account')); ?>" />
-          <p>The secret key used to access the API (if any).</p>
-        </fieldset>
-        <fieldset>
           <legend>Webhook secret</legend>
           <input type="text" name="hrmanager_webhook_secret" value="<?php echo esc_attr(get_option('hrmanager_webhook_secret')); ?>" />
-          <p>The shared secret used to invoke the webhook.</p>
+          <p>The shared secret used to invoke the webhook. The caller should include a field named WebhookSecret in the JSON, with the value set here.</p>
         </fieldset>
+        <fieldset>
+          <legend>URL slug</legend>
+          <input type="text" name="hrmanager_slug" value="<?php echo esc_attr(get_option('hrmanager_slug')); ?>" />
+          <p>The part first of the URL path for this post type.</p>
+        </fieldset>
+        <h3>Call importer</h3>
+
+            <p>You can trigger the import by calling the webhook</p>
+            <pre>
+
+<code>curl -X POST \
+<?php echo get_site_url(); ?>-json/hr-manager/v1/webhook \
+  -H 'content-type: application/json' \
+  -d '{
+   "Message":{
+      "EventType":"PositionPublished",
+      "ProjectId":143568
+   },
+   "DepartmentId":1,
+   "CustomerId":1,
+   "WebhookSecret":"<?php echo esc_attr(get_option('hrmanager_webhook_secret')); ?>"
+}'
+</code>
+            </pre>
+
         <?php submit_button();?></td>
      </form>
    </div>
@@ -258,11 +287,11 @@ settings_fields('hr-manager_options_group');
 }
 
 add_action('admin_init', function () {
-    add_option('hrmanager_account', '');
-    add_option('hrmanager_apikey', '');
-    add_option('hrmanager_webhook_secret', '');
+    add_option('hrmanager_customer_alias', '');
+    add_option('hrmanager_slug', 'positions');
+    add_option('hrmanager_webhook_secret', '12345');
     register_setting('hr-manager_options_group', 'hrmanager_customer_alias', 'sanitize');
-    register_setting('hr-manager_options_group', 'hrmanager_apikey', 'sanitize');
+    register_setting('hr-manager_options_group', 'hrmanager_slug', 'sanitize');
     register_setting('hr-manager_options_group', 'hrmanager_webhook_secret', 'sanitize');
 });
 
