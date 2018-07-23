@@ -8,10 +8,69 @@
  * Author URI: http://www.mywebsite.com
  */
 
-// Register the rest route here.
+function getPublishedPositions()
+{
+    $posts = get_posts([
+        'post_type' => 'hr-position',
+        'post_status' => 'publish',
+        'numberposts' => -1,
+    ]);
+    $result = [];
+    foreach ($posts as $post) {
+        $originalId = get_post_meta($post->ID, 'HRManagerId', true);
+        $result[$originalId] = (object) [
+            'postId' => $post->ID,
+        ];
+    }
+    return $result;
+}
+
+function updatePositions($positions)
+{
+    $status = (object) [
+        'updated' => 0,
+        'deleted' => 0,
+        'created' => 0,
+    ];
+    $existingPosts = getPublishedPositions();
+
+    // add or update app positions in the feed
+    foreach ($positions as $position) {
+        $post = [
+            'post_title' => $position->Name,
+            'post_type' => 'hr-position',
+            'post_status' => 'publish',
+            'post_content' => $position->Advertisements[0]->Content ?? '',
+        ];
+        if (!empty($existingPosts[$position->Id])) {
+            $post['ID'] = $existingPosts[$position->Id]->postId;
+            unset($existingPosts[$position->Id]);
+        }
+
+        if ($id = wp_insert_post($post, true)) {
+            if (empty($post['ID'])) {
+                $status->created++;
+            } else {
+                $status->updated++;
+            }
+            foreach (metaboxes() as $boxId => $metabox) {
+                $value = ($metabox->importValue)($position);
+                $value && add_post_meta($id, $boxId, $value);
+            }
+        }
+    }
+    // remove all posts not in the feed
+    foreach ($existingPosts as $existingPost) {
+        if (wp_delete_post($existingPost->postId)) {
+            $status->deleted++;
+        }
+    }
+    return $status;
+}
 
 function webhook(WP_REST_Request $request)
 {
+    getPublishedPositions();
     $customerAlias = get_option('hrmanager_customer_alias');
     $webhookSecret = get_option('hrmanager_webhook_secret');
     $json = $request->get_json_params();
@@ -20,46 +79,28 @@ function webhook(WP_REST_Request $request)
 
     // No customer alias has been set
     if (empty($customerAlias)) {
-        return new WP_Error('rest_invalid_customer_alias', __('No customer alias has been set up.'), array('status' => 500));
+        return new WP_Error('rest_invalid_customer_alias', __('No customer alias has been set up.'), ['status' => 500]);
     }
     // wrong webhook secret provided
     if (!empty($webhookSecret) && $webhookSecret != $receivedWebhookSecret) {
-        return new WP_Error('rest_invalid_secret_key', __('You must specify a valid WebhookSecret value in the call.'), array('status' => 401));
+        return new WP_Error('rest_invalid_secret_key', __('You must specify a valid WebhookSecret value in the call.'), ['status' => 401]);
     }
 
     switch ($eventType) {
         case 'PositionPublished':
+        case 'PositionUnpublished':
             $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1";
             $jsonResult = file_get_contents($url);
             if (!$jsonResult) {
-                return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', array('status' => 500));
+                return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
             }
             $decodedResult = json_decode($jsonResult);
             if ($decodedResult === null) {
-                return new WP_Error('rest_cannot_decode_data', '', array('status' => 500));
+                return new WP_Error('rest_cannot_decode_data', '', ['status' => 500]);
             }
             $positionList = $decodedResult->Items;
-            $positions = [];
-            foreach ($positionList as $position) {
-                $newPost = array(
-                    'import_id' => $position->Id,
-                    'post_title' => $position->Name,
-                    'post_type' => 'hr-position',
-                    'post_status' => 'publish',
-                    'post_content' => $position->Advertisements[0]->Content ?? '',
-                );
-                $positions[] = $newPost;
-                if ($id = wp_insert_post($newPost, true)) {
-                    foreach (metaboxes() as $boxId => $metabox) {
-                        $value = ($metabox->importValue)($position);
-                        $value && add_post_meta($id, $boxId, $value);
-                    }
-                }
-            }
-            return $positions;
+            return updatePositions($positionList);
 
-        case 'PositionUnpublished':
-            return true;
         default:
             return false;
     }
@@ -67,26 +108,24 @@ function webhook(WP_REST_Request $request)
 
 add_action('rest_api_init', function () {
 
-    register_rest_route('hr-manager/v1', 'webhook', array(
-
+    register_rest_route('hr-manager/v1', 'webhook', [
         'methods' => 'POST',
         'callback' => 'webhook',
-
-    ));
+    ]);
 
 });
 
 add_action('init', function () {
     register_post_type('hr-position',
-        array(
-            'labels' => array(
+        [
+            'labels' => [
                 'name' => __('HR positions'),
                 'singular_name' => __('HR Position'),
-            ),
+            ],
             'public' => true,
             'has_archive' => true,
-            'rewrite' => array('slug' => 'hr-positions'),
-        )
+            'rewrite' => ['slug' => 'hr-positions'],
+        ]
     );
 }, 5, 1);
 
@@ -98,58 +137,58 @@ function render_metabox($post, $metabox)
 
 function metaboxes()
 {
-    return array(
+    return [
 
-        'HRManagerId' => (object) array(
+        'HRManagerId' => (object) [
             'title' => __('HR Manager ID'),
             'importValue' => function ($item) {
                 return $item->Id ?? null;
             },
-        ),
-        'WorkPlace' => (object) array(
+        ],
+        'WorkPlace' => (object) [
             'title' => __('Work place'),
             'importValue' => function ($item) {
                 return $item->WorkPlace ?? null;
             },
-        ),
-        'ProjectLeaderName' => (object) array(
+        ],
+        'ProjectLeaderName' => (object) [
             'title' => __('Project leader'),
             'importValue' => function ($item) {
                 return $item->ProjectLeader ?? null;
             },
-        ),
-        'ProjectLeaderEmail' => (object) array(
+        ],
+        'ProjectLeaderEmail' => (object) [
             'title' => __('Project leader email'),
             'importValue' => function ($item) {
                 return $item->ProjectLeaderEmail ?? null;
             },
-        ),
-        'ProjectLeaderPhone' => (object) array(
+        ],
+        'ProjectLeaderPhone' => (object) [
             'title' => __('Project leader phone'),
             'importValue' => function ($item) {
                 return $item->ProjectLeader->Phone ?? null;
 
             },
-        ),
-        'Location' => (object) array(
+        ],
+        'Location' => (object) [
             'title' => __('Location'),
             'importValue' => function ($item) {
                 return $item->PositionLocation->Name ?? null;
             },
-        ),
-        'Category' => (object) array(
+        ],
+        'Category' => (object) [
             'title' => __('Category'),
             'importValue' => function ($item) {
                 return $item->PositionCategory->Name ?? null;
             },
-        ),
-        'ApplicationFormUrl' => (object) array(
+        ],
+        'ApplicationFormUrl' => (object) [
             'title' => __('Application form URL'),
             'importValue' => function ($item) {
                 return $item->ApplicationFormUrl ?? null;
             },
-        ),
-        'ApplicationDue' => (object) array(
+        ],
+        'ApplicationDue' => (object) [
             'title' => __('Application due'),
             'importValue' => function ($item) {
                 $match = preg_match("/\/Date\(([0-9]+)\)\//", $item->ApplicationDue, $output_array);
@@ -158,14 +197,14 @@ function metaboxes()
                 }
                 return $output_array[1] / 1000;
             },
-            'ImageUrl' => (object) array(
+            'ImageUrl' => (object) [
                 'title' => __('Image URL'),
                 'importValue' => function ($item) {
                     return $item->Advertisements[0]->ImageUrl ?? null;
                 },
-            ),
-        ),
-    );
+            ],
+        ],
+    ];
 }
 
 add_action('add_meta_boxes_hr-position', function ($post) {
