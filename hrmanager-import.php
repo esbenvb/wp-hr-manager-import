@@ -12,28 +12,53 @@
 
 function webhook(WP_REST_Request $request)
 {
+    $customerAlias = get_option('hrmanager_customer_alias');
+    $webhookSecret = get_option('hrmanager_webhook_secret');
     $json = $request->get_json_params();
     $eventType = $json['Message']['EventType'];
+    $receivedWebhookSecret = $json['WebhookSecret'] ?? '';
+
+    // No customer alias has been set
+    if (empty($customerAlias)) {
+        return new WP_Error('rest_invalid_customer_alias', __('No customer alias has been set up.'), array('status' => 500));
+    }
+    // wrong webhook secret provided
+    if (!empty($webhookSecret) && $webhookSecret != $receivedWebhookSecret) {
+        return new WP_Error('rest_invalid_secret_key', __('You must specify a valid WebhookSecret value in the call.'), array('status' => 401));
+    }
+
     switch ($eventType) {
         case 'PositionPublished':
-            $url = 'https://recruiter-api.hr-manager.net/jobportal.svc/jp-politiken/positionlist/json/';
-            $positionList = json_decode(file_get_contents($url))->Items;
-            $positions = [];
-            foreach ($positionList as $position) {
-                $newPost = array(
-                    'import_id' => $position->Id,
-                    'post_title' => $position->Name,
-                    'post_type' => 'hr-position',
-                    'post_status' => 'publish',
-                );
-                $positions[] = $newPost;
+            $url = "https://recrxuiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/";
+            try {
+                $jsonResult = file_get_contents($url);
+                if (!$jsonResult) {
+                    return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', array('status' => 500));
+                }
+                $decodedResult = json_decode($jsonResult);
+                if ($decodedResult === null) {
+                    return new WP_Error('rest_cannot_decode_data', '', array('status' => 500));
+                }
+                $positionList = $decodedResult->Items;
+                $positions = [];
+                foreach ($positionList as $position) {
+                    $newPost = array(
+                        'import_id' => $position->Id,
+                        'post_title' => $position->Name,
+                        'post_type' => 'hr-position',
+                        'post_status' => 'publish',
+                    );
+                    $positions[] = $newPost;
 
-                if ($id = wp_insert_post($newPost, true)) {
-                    foreach (metaboxes() as $boxId => $metabox) {
-                        $value = ($metabox->importValue)($position);
-                        $value && add_post_meta($id, $boxId, $value);
+                    if ($id = wp_insert_post($newPost, true)) {
+                        foreach (metaboxes() as $boxId => $metabox) {
+                            $value = ($metabox->importValue)($position);
+                            $value && add_post_meta($id, $boxId, $value);
+                        }
                     }
                 }
+            } catch (Exception $error) {
+                return new WP_Error('rest_cannot_get_data', $error, array('status' => 500));
             }
             return $positions;
 
@@ -137,3 +162,53 @@ add_action('add_meta_boxes_hr-position', function ($post) {
         );
     }
 }, 10, 1);
+
+function sanitize($value)
+{
+    return trim($value);
+}
+
+function hrmanager_options_page()
+{
+    ?>
+    <h1>HR Manager settings</h1>
+
+    <div class="wrap">
+    <form action="options.php" method="post">
+      <?php
+settings_fields('hr-manager_options_group');
+    do_settings_sections('hr-manager_options_group');
+    ?>
+       <fieldset>
+          <legend>Account</legend>
+          <input type="text" name="hrmanager_customer_alias" value="<?php echo esc_attr(get_option('hrmanager_customer_alias')); ?>" />
+          <p>Use the customer alias of the HR account.</p>
+        </fieldset>
+        <fieldset>
+          <legend>API key</legend>
+          <input type="text" name="hrmanager_apikey" value="<?php echo esc_attr(get_option('hrmanager_account')); ?>" />
+          <p>The secret key used to access the API (if any).</p>
+        </fieldset>
+        <fieldset>
+          <legend>Webhook secret</legend>
+          <input type="text" name="hrmanager_webhook_secret" value="<?php echo esc_attr(get_option('hrmanager_webhook_secret')); ?>" />
+          <p>The shared secret used to invoke the webhook.</p>
+        </fieldset>
+        <?php submit_button();?></td>
+     </form>
+   </div>
+    <?php
+}
+
+add_action('admin_init', function () {
+    add_option('hrmanager_account', '');
+    add_option('hrmanager_apikey', '');
+    add_option('hrmanager_webhook_secret', '');
+    register_setting('hr-manager_options_group', 'hrmanager_customer_alias', 'sanitize');
+    register_setting('hr-manager_options_group', 'hrmanager_apikey', 'sanitize');
+    register_setting('hr-manager_options_group', 'hrmanager_webhook_secret', 'sanitize');
+});
+
+add_action('admin_menu', function () {
+    add_options_page('HR Manager Settings', 'HR Manager', 'manage_options', 'hr-manager', 'hrmanager_options_page');
+});
