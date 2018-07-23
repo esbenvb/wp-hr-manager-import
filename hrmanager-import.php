@@ -29,36 +29,32 @@ function webhook(WP_REST_Request $request)
 
     switch ($eventType) {
         case 'PositionPublished':
-            $url = "https://recrxuiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/";
-            try {
-                $jsonResult = file_get_contents($url);
-                if (!$jsonResult) {
-                    return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', array('status' => 500));
-                }
-                $decodedResult = json_decode($jsonResult);
-                if ($decodedResult === null) {
-                    return new WP_Error('rest_cannot_decode_data', '', array('status' => 500));
-                }
-                $positionList = $decodedResult->Items;
-                $positions = [];
-                foreach ($positionList as $position) {
-                    $newPost = array(
-                        'import_id' => $position->Id,
-                        'post_title' => $position->Name,
-                        'post_type' => 'hr-position',
-                        'post_status' => 'publish',
-                    );
-                    $positions[] = $newPost;
-
-                    if ($id = wp_insert_post($newPost, true)) {
-                        foreach (metaboxes() as $boxId => $metabox) {
-                            $value = ($metabox->importValue)($position);
-                            $value && add_post_meta($id, $boxId, $value);
-                        }
+            $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1";
+            $jsonResult = file_get_contents($url);
+            if (!$jsonResult) {
+                return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', array('status' => 500));
+            }
+            $decodedResult = json_decode($jsonResult);
+            if ($decodedResult === null) {
+                return new WP_Error('rest_cannot_decode_data', '', array('status' => 500));
+            }
+            $positionList = $decodedResult->Items;
+            $positions = [];
+            foreach ($positionList as $position) {
+                $newPost = array(
+                    'import_id' => $position->Id,
+                    'post_title' => $position->Name,
+                    'post_type' => 'hr-position',
+                    'post_status' => 'publish',
+                    'post_content' => $position->Advertisements[0]->Content ?? '',
+                );
+                $positions[] = $newPost;
+                if ($id = wp_insert_post($newPost, true)) {
+                    foreach (metaboxes() as $boxId => $metabox) {
+                        $value = ($metabox->importValue)($position);
+                        $value && add_post_meta($id, $boxId, $value);
                     }
                 }
-            } catch (Exception $error) {
-                return new WP_Error('rest_cannot_get_data', $error, array('status' => 500));
             }
             return $positions;
 
@@ -146,6 +142,28 @@ function metaboxes()
             'importValue' => function ($item) {
                 return $item->PositionCategory->Name ?? null;
             },
+        ),
+        'ApplicationFormUrl' => (object) array(
+            'title' => __('Application form URL'),
+            'importValue' => function ($item) {
+                return $item->ApplicationFormUrl ?? null;
+            },
+        ),
+        'ApplicationDue' => (object) array(
+            'title' => __('Application due'),
+            'importValue' => function ($item) {
+                $match = preg_match("/\/Date\(([0-9]+)\)\//", $item->ApplicationDue, $output_array);
+                if (!$match) {
+                    return null;
+                }
+                return $output_array[1] / 1000;
+            },
+            'ImageUrl' => (object) array(
+                'title' => __('Image URL'),
+                'importValue' => function ($item) {
+                    return $item->Advertisements[0]->ImageUrl ?? null;
+                },
+            ),
         ),
     );
 }
