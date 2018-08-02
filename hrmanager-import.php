@@ -27,7 +27,7 @@ function getPublishedPositions()
 
 function updatePositions($customerAlias)
 {
-    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1";
+    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1&inclogo=1&logosz=800&";
     $jsonResult = file_get_contents($url);
     if (!$jsonResult) {
         return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
@@ -213,6 +213,12 @@ function metaboxes()
                 return $item->Advertisements[0]->ImageUrl ?? null;
             },
         ],
+        'LogoUrl' => (object) [
+            'title' => __('Logo URL'),
+            'importValue' => function ($item) {
+                return $item->PositionLogo ?? null;
+            },
+        ],
     ];
 }
 
@@ -266,7 +272,7 @@ settings_fields('hr-manager_options_group');
             <pre>
 
 <code>curl -X POST \
-<?php echo get_site_url(); ?>-json/hr-manager/v1/webhook \
+<?php echo get_site_url(); ?>/wp-json/hr-manager/v1/webhook \
   -H 'content-type: application/json' \
   -d '{
    "Message":{
