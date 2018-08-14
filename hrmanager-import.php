@@ -66,7 +66,11 @@ function updatePositions($customerAlias)
             }
             foreach (metaboxes() as $boxId => $metabox) {
                 $value = ($metabox->importValue)($position);
-                $value && add_post_meta($id, $boxId, $value);
+                if ($value) {
+                    if( !add_post_meta($id, $boxId, $value, true) ) {
+                        update_post_meta($id, $boxId, $value);
+                    }
+                }
             }
         }
     }
@@ -200,11 +204,11 @@ function metaboxes()
         'ApplicationDue' => (object) [
             'title' => __('Application due'),
             'importValue' => function ($item) {
-                $match = preg_match("/\/Date\(([0-9]+)\)\//", $item->ApplicationDue, $output_array);
+                $match = preg_match("/\/Date\(([0-9]+)000\)\//", $item->ApplicationDue, $output_array);
                 if (!$match) {
                     return null;
                 }
-                return $output_array[1] / 1000;
+                return $output_array[1];
             },
         ],
         'ImageUrl' => (object) [
