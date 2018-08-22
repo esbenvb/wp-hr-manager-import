@@ -27,7 +27,7 @@ function getPublishedPositions()
 
 function updatePositions($customerAlias)
 {
-    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1&inclogo=1&logosz=800&";
+    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1&inclogo=1&logosz=800&bpc=1";
     $jsonResult = file_get_contents($url);
     if (!$jsonResult) {
         return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
