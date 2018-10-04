@@ -1,0 +1,67 @@
+Array
+(
+    [value] => 181612
+    [id] => 548
+    [boxId] => HRManagerId
+)
+Array
+(
+    [value] => JP/Politikens Hus - Børneavisen
+    [id] => 548
+    [boxId] => WorkPlace
+)
+Array
+(
+    [value] => Pernille Ravn
+    [id] => 548
+    [boxId] => ProjectLeaderName
+)
+Array
+(
+    [value] => pernille.ravn@jppol.dk
+    [id] => 548
+    [boxId] => ProjectLeaderEmail
+)
+Array
+(
+    [value] => 
+    [id] => 548
+    [boxId] => ProjectLeaderPhone
+)
+Array
+(
+    [value] => 
+    [id] => 548
+    [boxId] => Location
+)
+Array
+(
+    [value] => Salg
+    [id] => 548
+    [boxId] => Category
+)
+Array
+(
+    [value] => https://candidate.hr-manager.net/ApplicationInit.aspx?cid=333&ProjectId=181612&DepartmentId=21663&MediaId=5&SkipAdvertisement=true
+    [id] => 548
+    [boxId] => ApplicationFormUrl
+)
+Array
+(
+    [value] => 1535839140
+    [id] => 548
+    [boxId] => ApplicationDue
+)
+Array
+(
+    [value] => https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=138910&cid=333
+    [id] => 548
+    [boxId] => ImageUrl
+)
+Array
+(
+    [value] => https://cdn-recruiter.hr-manager.net//GetProjectLogo.ashx?cid=333&departmentId=21663&ProjectId=181612&MaxSize=800&tick=
+    [id] => 548
+    [boxId] => LogoUrl
+)
+{"updated":9,"deleted":0,"created":0}

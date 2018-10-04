@@ -27,7 +27,7 @@ function getPublishedPositions()
 
 function updatePositions($customerAlias)
 {
-    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1&inclogo=1&logosz=800&";
+    $url = "https://recruiter-api.hr-manager.net/jobportal.svc/$customerAlias/positionlist/json/?incads=1&useutc=1&inclogo=1&logosz=800&bpc=1";
     $jsonResult = file_get_contents($url);
     if (!$jsonResult) {
         return new WP_Error('rest_cannot_get_data', 'Make sure the Customer Alias is correct', ['status' => 500]);
@@ -180,7 +180,6 @@ function metaboxes()
             'title' => __('Project leader phone'),
             'importValue' => function ($item) {
                 return $item->ProjectLeader->Phone ?? null;
-
             },
         ],
         'Location' => (object) [
@@ -221,6 +220,12 @@ function metaboxes()
             'title' => __('Logo URL'),
             'importValue' => function ($item) {
                 return $item->PositionLogo ?? null;
+            },
+        ],
+        'Introduction' => (object) [
+            'title' => __('Introduction'),
+            'importValue' => function ($item) {
+                return $item->Advertisements[0]->Introduction ?? null;
             },
         ],
     ];
