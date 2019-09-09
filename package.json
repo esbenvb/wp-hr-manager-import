@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/esbenvb/wp-hr-manager-import/issues"
   },
-  "homepage": "https://github.com/esbenvb/wp-hr-manager-import#readme"
+  "homepage": "https://github.com/esbenvb/wp-hr-manager-import#readme",
+  "require": {
+    "php": ">=5.3.3",
+    "composer/installers": "~1.0"
+  }
 }
