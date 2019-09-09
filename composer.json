@@ -1,0 +1,12 @@
+{
+    "name": "esbenvb/wp-hr-manager-import",
+    "type": "wordpress-plugin",
+    "authors": [
+        {
+            "name": "Esben von Buchwald",
+            "email": "esben@vonbuchwald.dk"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
