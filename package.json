@@ -1,0 +1,19 @@
+{
+  "name": "wp-hr-manager-import",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esbenvb/wp-hr-manager-import.git"
+  },
+  "author": "Esben von Buchwald",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/esbenvb/wp-hr-manager-import/issues"
+  },
+  "homepage": "https://github.com/esbenvb/wp-hr-manager-import#readme"
+}
