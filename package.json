@@ -5,7 +5,7 @@
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/esbenvb/wp-hr-manager-import.git"
+    "url": "https://github.com/esbenvb/wp-hr-manager-import.git"
   },
   "author": "Esben von Buchwald",
   "license": "ISC",
